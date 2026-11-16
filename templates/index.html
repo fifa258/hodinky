@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Čas serveru</title>
+  <style>
+    :root {
+      --bg: #101820;
+      --face: #f4f1ea;
+      --tick: #2b2b2b;
+      --hand: #222;
+      --second: #d62828;
+      --accent: #e9c46a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2rem;
+      background: var(--bg);
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: #eaeaea;
+    }
+    h1 { font-weight: 400; letter-spacing: .05em; }
+    .digital {
+      font-variant-numeric: tabular-nums;
+      font-size: clamp(1.5rem, 4vw, 2.5rem);
+      color: var(--accent);
+      letter-spacing: .08em;
+    }
+    .digital small { display: block; font-size: .9rem; color: #9ab; text-align: center; margin-top: .3rem; }
+
+    /* Analogový ciferník */
+    .clock {
+      width: min(70vmin, 340px);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: var(--face);
+      position: relative;
+      box-shadow: 0 0 0 10px #1f2a35, 0 0 40px rgba(0,0,0,.6);
+    }
+    .hand {
+      position: absolute;
+      left: 50%;
+      bottom: 50%;
+      transform-origin: bottom center;
+      border-radius: 4px;
+    }
+    .hour   { width: 8px; height: 27%; background: var(--hand); margin-left: -4px; }
+    .minute { width: 5px; height: 38%; background: var(--hand); margin-left: -2.5px; }
+    .second { width: 2px; height: 43%; background: var(--second); margin-left: -1px; }
+    .pin {
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 14px; height: 14px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: var(--second);
+    }
+    .tick {
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 1px; height: 50%;
+      transform-origin: top center;
+    }
+    .tick::after {
+      content: "";
+      position: absolute;
+      bottom: 0; left: 50%;
+      width: 2px; height: 10px;
+      margin-left: -1px;
+      background: var(--tick);
+    }
+    .tick.major::after { width: 4px; height: 16px; margin-left: -2px; }
+    .num {
+      position: absolute;
+      left: 50%; top: 50%;
+      font-size: clamp(0.9rem, 3vmin, 1.3rem);
+      font-weight: 600;
+      color: var(--tick);
+    }
+  </style>
+</head>
+<body>
+  <h1>Čas serveru</h1>
+
+  <div class="clock" id="clock">
+    <div class="hand hour" id="hHour"></div>
+    <div class="hand minute" id="hMinute"></div>
+    <div class="hand second" id="hSecond"></div>
+    <div class="pin"></div>
+  </div>
+
+  <div class="digital" id="digital">--:--:--<small id="date"></small></div>
+
+  <script>
+    // Synchronizace s časem serveru:SERVER_EPOCH je epoch v ms podle serveru,
+    // performance.now() řeší uplynulý čas lokálně (bez driftu při přepnutí záložky).
+    const SERVER_EPOCH = {{ epoch_ms }};
+    const BASE_PERF = performance.now();
+
+    const clock = document.getElementById('clock');
+
+    // Ručičky
+    const hHour = document.getElementById('hHour');
+    const hMinute = document.getElementById('hMinute');
+    const hSecond = document.getElementById('hSecond');
+    const digital = document.getElementById('digital');
+    const dateEl = document.getElementById('date');
+
+    // Tipy a číslice ciferníku
+    for (let i = 0; i < 60; i++) {
+      const t = document.createElement('div');
+      t.className = 'tick' + (i % 5 === 0 ? ' major' : '');
+      t.style.transform = `rotate(${i * 6}deg)`;
+      clock.appendChild(t);
+    }
+    for (let n = 1; n <= 12; n++) {
+      const el = document.createElement('div');
+      el.className = 'num';
+      const a = (n * 30 - 90) * Math.PI / 180;
+      const r = 40; // % rozměru ciferníku (~80 % poloměru)
+      el.textContent = n;
+      el.style.left = `${50 + Math.cos(a) * r}%`;
+      el.style.top = `${50 + Math.sin(a) * r}%`;
+      el.style.transform = 'translate(-50%, -50%)';
+      clock.appendChild(el);
+    }
+
+    function serverDate() {
+      const elapsed = performance.now() - BASE_PERF;
+      return new Date(SERVER_EPOCH + elapsed);
+    }
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function render() {
+      const d = serverDate();
+      const ms = d.getMilliseconds();
+      const s = d.getSeconds() + ms / 1000;
+      const m = d.getMinutes() + s / 60;
+      const h = (d.getHours() % 12) + m / 60;
+
+      hSecond.style.transform = `rotate(${s * 6}deg)`;
+      hMinute.style.transform = `rotate(${m * 6}deg)`;
+      hHour.style.transform = `rotate(${h * 30}deg)`;
+
+      digital.firstChild.textContent =
+        `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+      dateEl.textContent = d.toLocaleDateString('cs-CZ', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+      });
+
+      requestAnimationFrame(render);
+    }
+    render();
+  </script>
+</body>
+</html>
